@@ -1,10 +1,11 @@
 package controller;
-
-import util.Util;
+import util.*;
 import java.util.List;
+import java.util.Map;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -12,7 +13,16 @@ import javax.servlet.http.HttpServletResponse;
 import annotation.*;
 
 public class FrontController extends HttpServlet {
-    private Boolean isVoatety = false;
+    HashMap<String,Mapping> map;
+    public void init() throws ServletException {
+        try {
+            String package_name = this.getInitParameter("package_name");
+            map = Util.getAllClassesSelonAnnotation(package_name,ControllerAnnotation.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        }
 
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         processedRequest(req, res);
@@ -26,22 +36,16 @@ public class FrontController extends HttpServlet {
         res.setContentType("text/plain");
         PrintWriter out = res.getWriter();
         out.println("Tongasoa ato am FrontController");
-        out.println("Votre url : " + req.getRequestURL().toString());
-        List<String> controllerNames = new ArrayList<>();
-        if (!isVoatety) {
-            try {
-                String package_name = this.getInitParameter("package_name");
-                controllerNames = Util.getAllClassesSelonAnnotation(package_name,ControllerAnnotation.class);
-                isVoatety = true;
-            } catch (Exception e) {
-                e.printStackTrace();
-                out.println("Erreur lors du scan du package : " + e.getMessage());
+        String url= req.getRequestURI().toString();
+        boolean urlexist=false;
+        for (String cle:map.keySet()){
+            if (cle.equals(req.getRequestURI().toString())) {
+                out.println("Votre url : "+url +" est associe a la methode : "+ map.get(cle).getMethodeName()+" dans la classe : "+(map.get(cle).getClassName()));
+                urlexist=true;
             }
         }
-
-        out.println("Liste des contrôleurs : ");
-        for (String controllerName : controllerNames) {
-            out.println(controllerName);
+        if (!urlexist) {
+            out.println("Aucune methode n'est associe a l url : "+url);
         }
     }
 }
