@@ -31,7 +31,7 @@ public class Util {
                             for (Method m : methods) {
                                 if (m.isAnnotationPresent(Get.class)) {
                                     Get getAnnotation= m.getAnnotation(Get.class);
-                                    hm.put(getAnnotation.url(),new Mapping(clazz.getSimpleName(),m.getName()));
+                                    hm.put(getAnnotation.url(),new Mapping(clazz.getName(),m.getName()));
                                 }
                             }
                         }

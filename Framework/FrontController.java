@@ -10,6 +10,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.*;
 import annotation.*;
 
 public class FrontController extends HttpServlet {
@@ -39,9 +40,21 @@ public class FrontController extends HttpServlet {
         String url= req.getRequestURI().toString();
         boolean urlexist=false;
         for (String cle:map.keySet()){
-            if (cle.equals(req.getRequestURI().toString())) {
-                out.println("Votre url : "+url +" est associe a la methode : "+ map.get(cle).getMethodeName()+" dans la classe : "+(map.get(cle).getClassName()));
-                urlexist=true;
+            if (cle.equals(url)) {
+                //out.println("Votre url : "+url +" est associe a la methode : "+ map.get(cle).getMethodeName()+" dans la classe : "+(map.get(cle).getClassName()));
+                Mapping mapping=map.get(url);
+                try {
+                    Class<?>c=Class.forName(mapping.getClassName());
+                    Method m=c.getDeclaredMethod(mapping.getMethodeName());
+                    Object instance=c.getDeclaredConstructor().newInstance();
+                    Object result=m.invoke(instance);
+                    out.println(result.toString());
+                    urlexist=true;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+               
+
             }
         }
         if (!urlexist) {
