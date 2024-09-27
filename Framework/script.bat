@@ -8,7 +8,7 @@ if not exist "%DESTINATION_DIR%\lib" (
 )
 
 REM Compiler les fichiers Java
-javac -d .\classes *.java
+javac -cp .\lib\* -d .\classes *.java
 
 REM Créer le fichier JAR
 jar -cf .\framework.jar -C .\classes .
