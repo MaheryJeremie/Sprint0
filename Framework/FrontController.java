@@ -25,6 +25,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import annotation.*;
 import model.*;
+import com.google.gson.Gson;
+
 
 public class FrontController extends HttpServlet {
     private List<String> controllers;
@@ -137,36 +139,57 @@ public class FrontController extends HttpServlet {
                     }
                     result = m.invoke(instance, parameterValues);
                 }
-
-                if (result instanceof ModelView) {
-                    ModelView mv = (ModelView) result;
-                    String jspPath = mv.getUrl();
-                    ServletContext context = getServletContext();
-                    String realPath = context.getRealPath(jspPath);
-
-                    if (realPath == null || !new File(realPath).exists()) {
-                        throw new ServletException("The JSP page " + jspPath + " does not exist.");
+                if (m.isAnnotationPresent(Restapi.class)) {
+                    if (result instanceof ModelView) {
+                        ModelView mv = (ModelView) result;
+                        HashMap<String, Object> data = mv.getData();
+                        Gson gson = new Gson();
+                        String json = gson.toJson(data);
+                        res.setContentType("application/json"); 
+                        out.println(json);
+                    } else {
+                        Gson gson = new Gson();
+                        String json = gson.toJson(result);
+                        res.setContentType("application/json");
+                        out.println(json);
                     }
-
-                    HashMap<String, Object> data = mv.getData();
-                    for (Map.Entry<String, Object> entry : data.entrySet()) {
-                        req.setAttribute(entry.getKey(), entry.getValue());
-                    }
-
-                    RequestDispatcher dispatch = req.getRequestDispatcher(jspPath);
-                    dispatch.forward(req, res);
-                } else if (result instanceof String) {
-                    out.println(result.toString());
-                } else {
-                    throw new ServletException("Unknown return type: " + result.getClass().getSimpleName());
                 }
+                else{
+                    if (result instanceof ModelView) {
+                        ModelView mv = (ModelView) result;
+                        String jspPath = mv.getUrl();
+                        ServletContext context = getServletContext();
+                        String realPath = context.getRealPath(jspPath);
+    
+                        if (realPath == null || !new File(realPath).exists()) {
+                            throw new ServletException("The JSP page " + jspPath + " does not exist.");
+                        }
+    
+                        HashMap<String, Object> data = mv.getData();
+                        for (Map.Entry<String, Object> entry : data.entrySet()) {
+                            req.setAttribute(entry.getKey(), entry.getValue());
+                        }
+    
+                        RequestDispatcher dispatch = req.getRequestDispatcher(jspPath);
+                        dispatch.forward(req, res);
+                    } else if (result instanceof String) {
+                        out.println(result.toString());
+                    } else {
+                        throw new ServletException("Unknown return type: " + result.getClass().getSimpleName());
+                    }
+                }
+
+                
             } catch (Exception e) {
                 e.printStackTrace();
                 req.setAttribute("error", e.getMessage());
                 RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
                 dispatch.forward(req, res);
             }
-        }
+
+                }
+
+                
 
         if (!urlExists) {
             out.println("No method is associated with the URL: " + url);
