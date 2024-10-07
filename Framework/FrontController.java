@@ -79,6 +79,11 @@ public class FrontController extends HttpServlet {
                 if (m == null) {
                     throw new ServletException("Method " + mapping.getMethodeName() + " not found in class " + mapping.getClassName());
                 }
+                String requestMethod=req.getMethod();
+                String methodVerb=mapping.getVerb();
+                if (!methodVerb.equalsIgnoreCase(requestMethod) && !methodVerb.isEmpty()) {
+                    throw new ServletException("Mauvaise requete HTTP . Attendu : "+methodVerb+" .Recu : "+ requestMethod);
+                }
 
                 Parameter[] params = m.getParameters();
                 Object instance = c.getDeclaredConstructor().newInstance();
