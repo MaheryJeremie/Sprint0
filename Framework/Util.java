@@ -43,15 +43,27 @@ public class Util {
                 Class<?>clazz=Class.forName(c);
                 Method[]methods=clazz.getDeclaredMethods();
                 for (Method m : methods) {
-                    if (m.isAnnotationPresent(Get.class)) {
-                        Get getAnnotation= m.getAnnotation(Get.class);
-                        String lien = getAnnotation.url();
+                    if (m.isAnnotationPresent(Url.class)) {
+                        Url urlAnnotation= m.getAnnotation(Url.class);
+                        String lien = urlAnnotation.url();
                         for(String key:hm.keySet()){
                             if(lien.equals(key))
-                                 throw new Exception("Duplicate url : "+getAnnotation.url());
+                                 throw new Exception("Duplicate url : "+urlAnnotation.url());
                             }
-                                    
-                    hm.put(lien,new Mapping(clazz.getName(),m.getName()));
+                    boolean isGet=m.isAnnotationPresent(Get.class);
+                    boolean isPost=m.isAnnotationPresent(Post.class);
+                    if (!isGet && !isPost) {
+                        isGet=true;
+                    }
+                    if (lien==null && !isGet && !isPost) {
+                        continue;
+                    }
+                    if (isGet) {
+                        hm.put(lien,new Mapping(clazz.getName(),m.getName(),"GET"));
+                    }
+                    else if(isPost){
+                        hm.put(lien,new Mapping(clazz.getName(),m.getName(),"POST"));
+                    }           
                     }
                 }
             }
