@@ -36,34 +36,35 @@ public class Util {
        
         return controllerNames;
     }
-    public static HashMap<String,Mapping> getAllMethods(List<String>controllers) throws Exception{
-        HashMap<String,Mapping> hm=new HashMap<>();
+    public static HashMap<String, Mapping> getAllMethods(List<String> controllers) throws Exception {
+        HashMap<String, Mapping> hm = new HashMap<>();
         try {
             for (String c : controllers) {
-                Class<?>clazz=Class.forName(c);
-                Method[]methods=clazz.getDeclaredMethods();
+                Class<?> clazz = Class.forName(c);
+                Method[] methods = clazz.getDeclaredMethods();
                 for (Method m : methods) {
                     if (m.isAnnotationPresent(Url.class)) {
-                        Url urlAnnotation= m.getAnnotation(Url.class);
+                        Url urlAnnotation = m.getAnnotation(Url.class);
                         String lien = urlAnnotation.url();
-                        for(String key:hm.keySet()){
-                            if(lien.equals(key))
-                                 throw new Exception("Duplicate url : "+urlAnnotation.url());
-                            }
-                    boolean isGet=m.isAnnotationPresent(Get.class);
-                    boolean isPost=m.isAnnotationPresent(Post.class);
-                    if (!isGet && !isPost) {
-                        isGet=true;
-                    }
-                    if (lien==null && !isGet && !isPost) {
-                        continue;
-                    }
-                    if (isGet) {
-                        hm.put(lien,new Mapping(clazz.getName(),m.getName(),"GET"));
-                    }
-                    else if(isPost){
-                        hm.put(lien,new Mapping(clazz.getName(),m.getName(),"POST"));
-                    }           
+                        
+                        if (!hm.containsKey(lien)) {
+                            hm.put(lien, new Mapping(clazz.getName()));
+                        }
+                        
+                        boolean isGet = m.isAnnotationPresent(Get.class);
+                        boolean isPost = m.isAnnotationPresent(Post.class);
+                        if (!isGet && !isPost) {
+                            isGet = true;
+                        }
+    
+                        String verb = null;
+                        if (isGet) {
+                            verb="GET";
+                        }
+                        else{
+                            verb="POST";
+                        }
+                        hm.get(lien).addVerbAction(m.getName(), verb);
                     }
                 }
             }
