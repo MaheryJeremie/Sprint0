@@ -3,6 +3,7 @@ package controller;
 import util.Util;
 import util.Mapping;
 import util.MySession;
+import util.VerbAction;
 import java.util.List;
 import java.util.Map;
 import java.io.File;
@@ -26,7 +27,6 @@ import java.lang.reflect.Parameter;
 import annotation.*;
 import model.*;
 import com.google.gson.Gson;
-
 
 public class FrontController extends HttpServlet {
     private List<String> controllers;
@@ -64,42 +64,43 @@ public class FrontController extends HttpServlet {
         if (map.containsKey(url)) {
             urlExists = true;
             Mapping mapping = map.get(url);
+            String requestMethod = req.getMethod();
 
             try {
-                Class<?> c = Class.forName(mapping.getClassName());
-                Method[] methods = c.getDeclaredMethods();
                 Method m = null;
-                for (Method method : methods) {
-                    if (method.getName().equals(mapping.getMethodeName())) {
-                        m = method;
+                for (VerbAction action : mapping.getVerbactions()) {
+                    if (action.getVerb().equalsIgnoreCase(requestMethod)) {
+                        Class<?> c = Class.forName(mapping.getClassName());
+                        Method[] methods = c.getDeclaredMethods();
+                        for (Method method : methods) {
+                            if (method.getName().equals(action.getMethodName())) {
+                                m = method;
+                                break;
+                            }
+                        }
                         break;
                     }
                 }
 
                 if (m == null) {
-                    throw new ServletException("Method " + mapping.getMethodeName() + " not found in class " + mapping.getClassName());
-                }
-                String requestMethod=req.getMethod();
-                String methodVerb=mapping.getVerb();
-                if (!methodVerb.equalsIgnoreCase(requestMethod) && !methodVerb.isEmpty()) {
-                    throw new ServletException("Mauvaise requete HTTP . Attendu : "+methodVerb+" .Recu : "+ requestMethod);
+                    throw new ServletException("Method not found in class " + mapping.getClassName());
                 }
 
                 Parameter[] params = m.getParameters();
-                Object instance = c.getDeclaredConstructor().newInstance();
-                Field[]attributs=c.getDeclaredFields();
+                Object instance = Class.forName(mapping.getClassName()).getDeclaredConstructor().newInstance();
+                Field[] attributs = instance.getClass().getDeclaredFields();
                 for (Field field : attributs) {
-                    if(field.getType().equals(MySession.class)){
+                    if (field.getType().equals(MySession.class)) {
                         HttpSession httpSession = req.getSession(false);
                         if (httpSession == null) {
                             httpSession = req.getSession(true);
                         }
                         MySession session = new MySession(httpSession);
                         field.setAccessible(true);
-                        field.set(instance, session); 
+                        field.set(instance, session);
                     }
-                    
                 }
+
                 Object result;
 
                 if (params.length < 1) {
@@ -144,13 +145,14 @@ public class FrontController extends HttpServlet {
                     }
                     result = m.invoke(instance, parameterValues);
                 }
+
                 if (m.isAnnotationPresent(Restapi.class)) {
                     if (result instanceof ModelView) {
                         ModelView mv = (ModelView) result;
                         HashMap<String, Object> data = mv.getData();
                         Gson gson = new Gson();
                         String json = gson.toJson(data);
-                        res.setContentType("application/json"); 
+                        res.setContentType("application/json");
                         out.println(json);
                     } else {
                         Gson gson = new Gson();
@@ -158,23 +160,22 @@ public class FrontController extends HttpServlet {
                         res.setContentType("application/json");
                         out.println(json);
                     }
-                }
-                else{
+                } else {
                     if (result instanceof ModelView) {
                         ModelView mv = (ModelView) result;
                         String jspPath = mv.getUrl();
                         ServletContext context = getServletContext();
                         String realPath = context.getRealPath(jspPath);
-    
+
                         if (realPath == null || !new File(realPath).exists()) {
                             throw new ServletException("The JSP page " + jspPath + " does not exist.");
                         }
-    
+
                         HashMap<String, Object> data = mv.getData();
                         for (Map.Entry<String, Object> entry : data.entrySet()) {
                             req.setAttribute(entry.getKey(), entry.getValue());
                         }
-    
+
                         RequestDispatcher dispatch = req.getRequestDispatcher(jspPath);
                         dispatch.forward(req, res);
                     } else if (result instanceof String) {
@@ -184,22 +185,21 @@ public class FrontController extends HttpServlet {
                     }
                 }
 
-                
             } catch (Exception e) {
-                e.printStackTrace();
+                //e.printStackTrace();
                 req.setAttribute("error", e.getMessage());
                 RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
+                res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 dispatch.forward(req, res);
             }
-
-                }
-
-                
+        }
 
         if (!urlExists) {
-            out.println("No method is associated with the URL: " + url);
+            req.setAttribute("error", "No method is associated with the URL: " + url);
+            RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
+            res.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            dispatch.forward(req, res);
+            //out.println("Error 404 - No method is associated with the URL: " + url);
         }
     }
-    
-    
 }
