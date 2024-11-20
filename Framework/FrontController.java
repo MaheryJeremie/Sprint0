@@ -1,6 +1,7 @@
 package controller;
 
 import util.Util;
+import util.FormValidator;
 import util.Mapping;
 import util.MySession;
 import util.VerbAction;
@@ -151,8 +152,10 @@ public class FrontController extends HttpServlet {
                                 String fieldName = field.getName();
                                 String paramValue = req.getParameter(objName + "." + fieldName);
                                 field.setAccessible(true);
+                                FormValidator.validateField(field, paramValue);
                                 field.set(paramObjectInstance, Util.convertParameterValue(paramValue, field.getType()));
                             }
+                            FormValidator.validate(paramObjectInstance);
                             parameterValues[i] = paramObjectInstance;
                         } else {
                             String paramName = param.getName();
@@ -218,7 +221,7 @@ public class FrontController extends HttpServlet {
                 }
 
             } catch (Exception e) {
-                //e.printStackTrace();
+                e.printStackTrace();
                 req.setAttribute("error", e.getMessage());
                 RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
                 res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -236,3 +239,7 @@ public class FrontController extends HttpServlet {
         }
     }
 }
+/*
+ * j ai deja l annotation required
+non parce que par exemple j envoie un string non numerique dans le champ age ou je rempli pas le champ ,dans la classe age est un int et est annote numeric et required.DOnc avant de valider,le string ou le nul est parse en int et ca marche pas donc j obtines une exception de NumberFormat mais pas que la valeur doit etre numeric .L exception du parse est obtenu avant .
+ */
