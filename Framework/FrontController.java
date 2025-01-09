@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,7 +29,7 @@ import java.lang.reflect.Parameter;
 import annotation.*;
 import model.*;
 import com.google.gson.Gson;
-import model.Fichier;
+
 import javax.servlet.http.Part;
 import javax.servlet.annotation.MultipartConfig;
 
@@ -40,11 +41,15 @@ import javax.servlet.annotation.MultipartConfig;
 public class FrontController extends HttpServlet {
     private List<String> controllers;
     private HashMap<String, Mapping> map;
+    private String authAttribute;
+    private String roleAttribute;
 
     @Override
     public void init() throws ServletException {
         try {
             String packageName = this.getInitParameter("package_name");
+            this.authAttribute = this.getInitParameter("auth");
+            this.roleAttribute = this.getInitParameter("roleName");
             controllers = Util.getAllClassesSelonAnnotation(packageName, ControllerAnnotation.class);
             map = Util.getAllMethods(controllers);
         } catch (Exception e) {
@@ -93,6 +98,25 @@ public class FrontController extends HttpServlet {
 
                 if (m == null) {
                     throw new ServletException("Method not found in class " + mapping.getClassName());
+                }
+                if (m.isAnnotationPresent(Auth.class)) {
+                    if (req.getSession(false).getAttribute(this.authAttribute)==null) {
+                        //res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        //out.println("Error 401 - Unauthorized action");
+                        res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
+                        return;
+                        //throw new ServletException("Unauthorized action");
+                    }
+                }
+                if (m.isAnnotationPresent(Role.class)) {
+                    Role role = m.getAnnotation(Role.class);
+                    String roleName = role.name();
+                    if(!req.getSession(false).getAttribute(this.roleAttribute).equals(roleName)) {
+                        res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
+                        return;
+                        //out.println("Error 401 - Unauthorized action");
+                        //throw new ServletException("Unauthorized action");
+                    }
                 }
 
                 Parameter[] params = m.getParameters();
@@ -144,18 +168,54 @@ public class FrontController extends HttpServlet {
                             }
                             
                         } else if (param.isAnnotationPresent(ParamObject.class)) {
+                            Map<String,String>values=new HashMap<String,String>();
                             ParamObject paramObjectAnnotation = param.getAnnotation(ParamObject.class);
                             String objName = paramObjectAnnotation.objName();
                             Object paramObjectInstance = param.getType().getDeclaredConstructor().newInstance();
                             Field[] fields = param.getType().getDeclaredFields();
+                            //Map<String, String> errors = new HashMap<>();
                             for (Field field : fields) {
                                 String fieldName = field.getName();
                                 String paramValue = req.getParameter(objName + "." + fieldName);
+                                values.put(objName + "." + fieldName, paramValue);
                                 field.setAccessible(true);
-                                FormValidator.validateField(field, paramValue);
+                                /*String errorMessage=FormValidator.validateField(objName,field, paramValue);
+                                 * if (errorMessage!=null){
+                                 * errors.put(objName + "." + fieldName,errorMessage);
+                                 * }
+                                */
+
                                 field.set(paramObjectInstance, Util.convertParameterValue(paramValue, field.getType()));
                             }
-                            FormValidator.validate(paramObjectInstance);
+                            /*
+                             
+                            */
+                            Map<String, String> errors = FormValidator.validateForm(objName,paramObjectInstance);
+                            if (!errors.isEmpty()) {
+                                req.setAttribute("errors", errors);
+                                req.setAttribute("values", values);
+
+                                OnError onError = m.getAnnotation(OnError.class);
+                                String errorUrl = null;
+                                if (onError != null) {
+                                    errorUrl = onError.url();
+                                }
+
+                                HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(req) {
+                                    @Override
+                                    public String getMethod() {
+                                        // Forcer la méthode à "GET"
+                                        return "GET";
+                                    }
+                                };
+
+                                
+                                RequestDispatcher dispatch = req.getRequestDispatcher(errorUrl);
+                                dispatch.forward(wrappedRequest, res);
+                                return;
+                            }
+                            
+
                             parameterValues[i] = paramObjectInstance;
                         } else {
                             String paramName = param.getName();
@@ -230,16 +290,9 @@ public class FrontController extends HttpServlet {
         }
 
         if (!urlExists) {
-            //req.setAttribute("error", "No method is associated with the URL: " + url);
-            //RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
-            //
-            //dispatch.forward(req, res);
-            res.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            out.println("Error 404 - No method is associated with the URL: " + url);
+            //res.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            //out.println("Error 404 - No method is associated with the URL: " + url);
+            res.sendError(HttpServletResponse.SC_NOT_FOUND,"No method is associated with the URL: " + url);
         }
     }
 }
-/*
- * j ai deja l annotation required
-non parce que par exemple j envoie un string non numerique dans le champ age ou je rempli pas le champ ,dans la classe age est un int et est annote numeric et required.DOnc avant de valider,le string ou le nul est parse en int et ca marche pas donc j obtines une exception de NumberFormat mais pas que la valeur doit etre numeric .L exception du parse est obtenu avant .
- */
