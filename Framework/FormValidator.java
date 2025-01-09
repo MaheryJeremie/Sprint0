@@ -2,6 +2,10 @@ package util;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.regex.Pattern;
 import annotation.*;
 import exception.*;
@@ -45,33 +49,87 @@ public class FormValidator {
             }
         }
     }
-    public static void validateField(Field field, Object value) throws ValidationException {
+    public static List<String> validateField(String objName,Field field, Object value){
+        List<String>errorMessages = new ArrayList<>();
+        String erreurMessage=null;
         field.setAccessible(true);
-
-        for (Annotation annotation : field.getAnnotations()) {
-            if (annotation instanceof Required) {
-                validateRequired(field, value);
-            } else if (annotation instanceof Numeric) {
-                validateNumeric(field, value);
-            } else if (annotation instanceof Min) {
-                validateMin(field, value, ((Min) annotation).value());
-            } else if (annotation instanceof Max) {
-                validateMax(field, value, ((Max) annotation).value());
-            } else if (annotation instanceof Range) {
-                validateRange(field, value, ((Range) annotation).min(), ((Range) annotation).max());
-            } else if (annotation instanceof LengthMin) {
-                validateLengthMin(field, value, ((LengthMin) annotation).value());
-            } else if (annotation instanceof LengthMax) {
-                validateLengthMax(field, value, ((LengthMax) annotation).value());
-            } else if (annotation instanceof RegexPattern) {
-                validatePattern(field, value, ((RegexPattern) annotation).regex());
-            } else if (annotation instanceof Email) {
-                validateEmail(field, value);
-            } else if (annotation instanceof DateFormat) {
-                validateDateFormat(field, value, ((DateFormat) annotation).pattern());
+        try{
+            for (Annotation annotation : field.getAnnotations()) {
+                if (annotation instanceof Required) {
+                    validateRequired(field, value);
+                } else if (annotation instanceof Numeric) {
+                    validateNumeric(field, value);
+                } else if (annotation instanceof Min) {
+                    validateMin(field, value, ((Min) annotation).value());
+                } else if (annotation instanceof Max) {
+                    validateMax(field, value, ((Max) annotation).value());
+                } else if (annotation instanceof Range) {
+                    validateRange(field, value, ((Range) annotation).min(), ((Range) annotation).max());
+                } else if (annotation instanceof LengthMin) {
+                    validateLengthMin(field, value, ((LengthMin) annotation).value());
+                } else if (annotation instanceof LengthMax) {
+                    validateLengthMax(field, value, ((LengthMax) annotation).value());
+                } else if (annotation instanceof RegexPattern) {
+                    validatePattern(field, value, ((RegexPattern) annotation).regex());
+                } else if (annotation instanceof Email) {
+                    validateEmail(field, value);
+                } else if (annotation instanceof DateFormat) {
+                    validateDateFormat(field, value, ((DateFormat) annotation).pattern());
+                }
             }
         }
+        catch(ValidationException e){
+            erreurMessage= e.getMessage().toString();
+            errorMessages.add(erreurMessage);
+        }
+        return errorMessages;
     }
+    public static Map<String, String> validateForm(String objName,Object formObject) {
+        Field[] fields = formObject.getClass().getDeclaredFields();
+        Map<String, String> errors = new HashMap<>();
+
+        for (Field field : fields) {
+            field.setAccessible(true);
+            Object value;
+            try {
+                value = field.get(formObject);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Could not access field value", e);
+            }
+
+            for (Annotation annotation : field.getAnnotations()) {
+                try {
+                    if (annotation instanceof Required) {
+                        validateRequired(field, value);
+                    } else if (annotation instanceof Numeric) {
+                        validateNumeric(field, value);
+                    } else if (annotation instanceof Min) {
+                        validateMin(field, value, ((Min) annotation).value());
+                    } else if (annotation instanceof Max) {
+                        validateMax(field, value, ((Max) annotation).value());
+                    } else if (annotation instanceof Range) {
+                        validateRange(field, value, ((Range) annotation).min(), ((Range) annotation).max());
+                    } else if (annotation instanceof LengthMin) {
+                        validateLengthMin(field, value, ((LengthMin) annotation).value());
+                    } else if (annotation instanceof LengthMax) {
+                        validateLengthMax(field, value, ((LengthMax) annotation).value());
+                    } else if (annotation instanceof RegexPattern) {
+                        validatePattern(field, value, ((RegexPattern) annotation).regex());
+                    } else if (annotation instanceof Email) {
+                        validateEmail(field, value);
+                    } else if (annotation instanceof DateFormat) {
+                        validateDateFormat(field, value, ((DateFormat) annotation).pattern());
+                    }
+                } catch (ValidationException e) {
+                    // Ajouter l'erreur pour le champ correspondant
+                    errors.put(objName+"."+field.getName(), e.getMessage());
+                }
+            }
+        }
+
+        return errors;
+    }
+
 
 
     private static void validateRequired(Field field, Object value) throws ValidationException {
