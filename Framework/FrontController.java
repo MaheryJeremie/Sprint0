@@ -31,6 +31,9 @@ import model.*;
 import com.google.gson.Gson;
 
 import javax.servlet.http.Part;
+
+import org.xml.sax.SAXException;
+
 import javax.servlet.annotation.MultipartConfig;
 
 @MultipartConfig(
@@ -72,7 +75,9 @@ public class FrontController extends HttpServlet {
         res.setContentType("text/html");
         PrintWriter out = res.getWriter();
 
-        String url = req.getRequestURI();
+        String uri = req.getRequestURI();
+        String contextPath=req.getContextPath()+"/";
+        String url=uri.substring(contextPath.length());
         boolean urlExists = false;
 
         if (map.containsKey(url)) {
@@ -81,10 +86,24 @@ public class FrontController extends HttpServlet {
             String requestMethod = req.getMethod();
 
             try {
+                Class<?> c = Class.forName(mapping.getClassName());
+                    if (c.isAnnotationPresent(Auth.class)) {
+                        if (req.getSession(false) == null || req.getSession(false).getAttribute(this.authAttribute) == null) {
+                            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized action");
+                            return;
+                        }
+                    }
+                    if (c.isAnnotationPresent(Role.class)) {
+                        Role roleClass = c.getAnnotation(Role.class);
+                        String classRoleName = roleClass.name();
+                        if (!classRoleName.equals(req.getSession(false).getAttribute(this.roleAttribute))) {
+                            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized action");
+                            return;
+                        }
+                    }
                 Method m = null;
                 for (VerbAction action : mapping.getVerbactions()) {
                     if (action.getVerb().equalsIgnoreCase(requestMethod)) {
-                        Class<?> c = Class.forName(mapping.getClassName());
                         Method[] methods = c.getDeclaredMethods();
                         for (Method method : methods) {
                             if (method.getName().equals(action.getMethodName())) {
@@ -101,11 +120,21 @@ public class FrontController extends HttpServlet {
                 }
                 if (m.isAnnotationPresent(Auth.class)) {
                     if (req.getSession(false).getAttribute(this.authAttribute)==null) {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
                         //res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         //out.println("Error 401 - Unauthorized action");
                         res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
                         return;
                         //throw new ServletException("Unauthorized action");
+=======
+                        res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
+                        return;
+>>>>>>> Stashed changes
+=======
+                        res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
+                        return;
+>>>>>>> Stashed changes
                     }
                 }
                 if (m.isAnnotationPresent(Role.class)) {
@@ -114,8 +143,14 @@ public class FrontController extends HttpServlet {
                     if(!req.getSession(false).getAttribute(this.roleAttribute).equals(roleName)) {
                         res.sendError(HttpServletResponse.SC_UNAUTHORIZED," Unauthorized action");
                         return;
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
                         //out.println("Error 401 - Unauthorized action");
                         //throw new ServletException("Unauthorized action");
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
                     }
                 }
 
@@ -130,7 +165,12 @@ public class FrontController extends HttpServlet {
                         }
                         MySession session = new MySession(httpSession);
                         field.setAccessible(true);
-                        field.set(instance, session);
+                        try {
+                            field.set(instance, session);
+                        } catch (IllegalAccessException e) {
+                            e.printStackTrace();
+                            throw new ServletException(e.getMessage());
+                        }
                     }
                 }
 
@@ -177,6 +217,8 @@ public class FrontController extends HttpServlet {
                             for (Field field : fields) {
                                 String fieldName = field.getName();
                                 String paramValue = req.getParameter(objName + "." + fieldName);
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
                                 values.put(objName + "." + fieldName, paramValue);
                                 field.setAccessible(true);
                                 /*String errorMessage=FormValidator.validateField(objName,field, paramValue);
@@ -190,6 +232,22 @@ public class FrontController extends HttpServlet {
                             /*
                              
                             */
+=======
+                                    if (paramValue != null) { 
+                                    values.put(objName + "." + fieldName, paramValue);
+                                    field.setAccessible(true);
+                                    field.set(paramObjectInstance, Util.convertParameterValue(paramValue, field.getType()));
+                                }
+                            }
+>>>>>>> Stashed changes
+=======
+                                    if (paramValue != null) { 
+                                    values.put(objName + "." + fieldName, paramValue);
+                                    field.setAccessible(true);
+                                    field.set(paramObjectInstance, Util.convertParameterValue(paramValue, field.getType()));
+                                }
+                            }
+>>>>>>> Stashed changes
                             Map<String, String> errors = FormValidator.validateForm(objName,paramObjectInstance);
                             if (!errors.isEmpty()) {
                                 req.setAttribute("errors", errors);
@@ -204,12 +262,24 @@ public class FrontController extends HttpServlet {
                                 HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(req) {
                                     @Override
                                     public String getMethod() {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
                                         // Forcer la méthode à "GET"
                                         return "GET";
                                     }
                                 };
 
                                 
+=======
+                                        return "GET";
+                                    }
+                                };
+>>>>>>> Stashed changes
+=======
+                                        return "GET";
+                                    }
+                                };
+>>>>>>> Stashed changes
                                 RequestDispatcher dispatch = req.getRequestDispatcher(errorUrl);
                                 dispatch.forward(wrappedRequest, res);
                                 return;
@@ -258,21 +328,36 @@ public class FrontController extends HttpServlet {
                 } else {
                     if (result instanceof ModelView) {
                         ModelView mv = (ModelView) result;
+                        
+                        if (mv.getRedirect() != null) {
+                            String redirectUrl = mv.getRedirect();
+                            if (mv.getRedirectMethod().equals("POST")) {
+                                req.getRequestDispatcher("/"+redirectUrl).forward(req,res);
+                            }
+                            else{
+                                res.sendRedirect("/"+redirectUrl);
+                            }
+                            return;
+                        }
+                    
                         String jspPath = mv.getUrl();
-                        ServletContext context = getServletContext();
-                        String realPath = context.getRealPath(jspPath);
-
-                        if (realPath == null || !new File(realPath).exists()) {
-                            throw new ServletException("The JSP page " + jspPath + " does not exist.");
+                        if (jspPath != null) {
+                            String realPath = req.getServletContext().getRealPath(jspPath);
+                            
+                            if (realPath == null || !new File(realPath).exists()) {
+                                throw new ServletException("The JSP page " + jspPath + " does not exist.");
+                            }
+                    
+                            HashMap<String, Object> data = mv.getData();
+                            for (Map.Entry<String, Object> entry : data.entrySet()) {
+                                req.setAttribute(entry.getKey(), entry.getValue());
+                            }
+                    
+                            RequestDispatcher dispatch = req.getRequestDispatcher("/"+jspPath);
+                            dispatch.forward(req, res);
+                        } else {
+                            throw new ServletException("ModelView does not contain a JSP URL.");
                         }
-
-                        HashMap<String, Object> data = mv.getData();
-                        for (Map.Entry<String, Object> entry : data.entrySet()) {
-                            req.setAttribute(entry.getKey(), entry.getValue());
-                        }
-
-                        RequestDispatcher dispatch = req.getRequestDispatcher(jspPath);
-                        dispatch.forward(req, res);
                     } else if (result instanceof String) {
                         out.println(result.toString());
                     } else {
@@ -282,16 +367,19 @@ public class FrontController extends HttpServlet {
 
             } catch (Exception e) {
                 e.printStackTrace();
-                req.setAttribute("error", e.getMessage());
-                RequestDispatcher dispatch = req.getRequestDispatcher("/error.jsp");
-                res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                dispatch.forward(req, res);
+                res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,e.getMessage());
             }
         }
 
         if (!urlExists) {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
             //res.setStatus(HttpServletResponse.SC_NOT_FOUND);
             //out.println("Error 404 - No method is associated with the URL: " + url);
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
             res.sendError(HttpServletResponse.SC_NOT_FOUND,"No method is associated with the URL: " + url);
         }
     }
